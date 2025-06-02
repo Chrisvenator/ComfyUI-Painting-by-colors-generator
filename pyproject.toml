@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Painting-by-colors-generator"
-version = "1.0.1"
+version = "1.0.2"
 description = "Create a painting by colors image from an image"
 authors = [
   {name = "chrisvenator", email = "55980003+Chrisvenator@users.noreply.github.com"}
