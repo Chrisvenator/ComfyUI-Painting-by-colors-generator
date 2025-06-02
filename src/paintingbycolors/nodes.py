@@ -1,7 +1,7 @@
-from .painting_by_numbers_calculate_numbers import ImprovedPaintByNumbersTemplateNode
-from .painting_by_numbers_hex_stack import HexStackNode
-from .painting_by_numbers_paste_numbers_on_image import NumbersOverlayNode, NumbersOverlayAdvancedNode
-from .painting_by_numbers_preprocessor import EnhancedPaintByNumbersNode
+from .calculate_numbers import ImprovedPaintByNumbersTemplateNode
+from .hex_stack import HexStackNode
+from .paste_numbers_on_image import NumbersOverlayNode, NumbersOverlayAdvancedNode
+from .preprocessor import EnhancedPaintByNumbersNode
 
 NODE_CLASS_MAPPINGS = {
     "PaintByNumbersNode": EnhancedPaintByNumbersNode,
