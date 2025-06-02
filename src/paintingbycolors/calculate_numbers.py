@@ -334,12 +334,12 @@ class ImprovedPaintByNumbersTemplateNode:
 
         return chart
 
-    def create_template(self, paint_by_numbers_image, lineart_image, num_colors,
+    def create_template(self, preprocessed_image, lineart_image, num_colors,
                         font_size, min_region_size, numbers_density, color_merge_threshold,
                         hex_stack=None):
         """Main function"""
         # Convert inputs
-        paint_by_numbers_pil = self.tensor_to_pil(paint_by_numbers_image)
+        paint_by_numbers_pil = self.tensor_to_pil(preprocessed_image)
         lineart_pil = self.tensor_to_pil(lineart_image)
 
         if paint_by_numbers_pil.mode != 'RGB':
