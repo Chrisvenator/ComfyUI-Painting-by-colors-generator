@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "paintingbycolors"
-version = "0.0.1"
-description = "Create a painting by colors image from an image and lineart"
+version = "1.0.0"
+description = "Create a painting by colors image from an image"
 authors = [
   {name = "ComfyUI-PaintingByColors", email = "you@gmail.com"}
 ]
@@ -15,6 +15,7 @@ classifiers = []
 dependencies = [
 
 ]
+
 
 [project.optional-dependencies]
 dev = [
@@ -39,8 +40,12 @@ Icon = ""
 [tool.setuptools.package-data]
 "*" = ["*.*"]
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.pytest.ini_options]
 minversion = "8.0"
+addopts = "-ra"
 testpaths = [
     "tests",
 ]
