@@ -16,7 +16,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "PaintByNumbersNode": "Paint by Numbers Preprocessor: K-Mean",
     "PaintByNumbersTemplateNode": "Paint by Numbers: Calculate numbers",
     "PaintByNumbersPaletteNode": "Paint by Numbers: Palette",
-    "NumbersOverlayNode": "Paint by Numbers: Numbers Overlay",
-    "NumbersOverlayAdvancedNode": "Paint by Numbers: Numbers Overlay (Advanced)",
+    "NumbersOverlayNode": "Paint by Numbers: overlay Numbers",
+    "NumbersOverlayAdvancedNode": "Paint by Numbers: overlay Numbers (Advanced)",
     "HexStackNode": "Hex Color Stack",
 }

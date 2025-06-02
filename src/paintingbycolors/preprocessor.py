@@ -14,21 +14,21 @@ class EnhancedPaintByNumbersNode:
             "required": {
                 "original_image": ("IMAGE",),
                 "blur_radius": ("FLOAT", {
-                    "default": 2.0,
+                    "default": 0.0,
                     "min": 0.0,
-                    "max": 10.0,
+                    "max": 100.0,
                     "step": 0.1,
                     "display": "number"
                 }),
                 "color_intensity": ("FLOAT", {
-                    "default": 1.2,
+                    "default": 1.0,
                     "min": 0.5,
                     "max": 2.0,
                     "step": 0.1,
                     "display": "number"
                 }),
                 "noise_reduction_strength": ("FLOAT", {
-                    "default": 2.0,
+                    "default": 5.0,
                     "min": 0.0,
                     "max": 5.0,
                     "step": 0.1,
@@ -43,7 +43,7 @@ class EnhancedPaintByNumbersNode:
                     "display": "checkbox"
                 }),
                 "min_region_size": ("INT", {
-                    "default": 100,
+                    "default": 800,
                     "min": 10,
                     "max": 1000,
                     "step": 10,
@@ -53,8 +53,8 @@ class EnhancedPaintByNumbersNode:
             "optional": {
                 "hex_stack": ("HEX_STACK",),
                 "num_colors": ("INT", {
-                    "default": 12,
-                    "min": 4,
+                    "default": 20,
+                    "min": 2,
                     "max": 50,
                     "step": 1,
                     "display": "number"
@@ -63,7 +63,7 @@ class EnhancedPaintByNumbersNode:
         }
 
     RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("color_quantized",)
+    RETURN_NAMES = ("preprocessed_image",)
     FUNCTION = "process"
     CATEGORY = "image/artistic"
 

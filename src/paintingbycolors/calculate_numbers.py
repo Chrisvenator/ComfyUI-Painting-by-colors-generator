@@ -11,38 +11,38 @@ class ImprovedPaintByNumbersTemplateNode:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "paint_by_numbers_image": ("IMAGE",),
+                "preprocessed_image": ("IMAGE",),
                 "lineart_image": ("IMAGE",),
                 "num_colors": ("INT", {
-                    "default": 12,
-                    "min": 4,
-                    "max": 30,
+                    "default": 20,
+                    "min": 2,
+                    "max": 1000,
                     "step": 1,
                     "display": "number"
                 }),
                 "font_size": ("INT", {
                     "default": 14,
-                    "min": 8,
-                    "max": 32,
+                    "min": 2,
+                    "max": 100,
                     "step": 1,
                     "display": "number"
                 }),
                 "min_region_size": ("INT", {
-                    "default": 100,
-                    "min": 20,
+                    "default": 50,
+                    "min": 0,
                     "max": 1000,
                     "step": 10,
                     "display": "number"
                 }),
                 "numbers_density": ("FLOAT", {
-                    "default": 0.002,
+                    "default": 0.000,
                     "min": 0.0,
-                    "max": 0.01,
+                    "max": 1,
                     "step": 0.0005,
                     "display": "number"
                 }),
                 "color_merge_threshold": ("FLOAT", {
-                    "default": 15.0,
+                    "default": 5.0,
                     "min": 5.0,
                     "max": 50.0,
                     "step": 2.5,
@@ -55,7 +55,7 @@ class ImprovedPaintByNumbersTemplateNode:
         }
 
     RETURN_TYPES = ("IMAGE", "IMAGE")
-    RETURN_NAMES = ("numbers_only", "color_palette_chart")
+    RETURN_NAMES = ("numbers_image", "color_palette")
     FUNCTION = "create_template"
     CATEGORY = "image/artistic"
 

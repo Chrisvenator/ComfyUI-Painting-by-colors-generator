@@ -11,7 +11,7 @@ class HexStackNode:
             "required": {
                 "hex_colors": ("STRING", {
                     "multiline": True,
-                    "default": "#FF0000\n#00FF00\n#0000FF\n#FFFF00\n#FF00FF\n#00FFFF\n#FFA500\n#800080\n#FFC0CB\n#A52A2A\n#808080\n#000000",
+                    "default": "#FFFFFF\n#F6D300\n#F88A00\n#E53935\n#EF5AA9\n#C2187E\n#7E3F98\n#53307A\n#2847A5\n#0062B8\n#4FA8F6\n#00A9B7\n#5AC9B3\n#8BC63F\n#3AAA35\n#00783E\n#C4D600\n#F4B183\n#C5863A\n#8B5C2F\n#000000\n",
                     "display": "text"
                 }),
                 "show_preview": ("BOOLEAN", {
