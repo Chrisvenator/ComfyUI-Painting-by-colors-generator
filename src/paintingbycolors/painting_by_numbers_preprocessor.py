@@ -13,19 +13,11 @@ class EnhancedPaintByNumbersNode:
         return {
             "required": {
                 "original_image": ("IMAGE",),
-                "lineart_image": ("IMAGE",),
                 "num_colors": ("INT", {
                     "default": 12,
                     "min": 4,
                     "max": 50,
                     "step": 1,
-                    "display": "number"
-                }),
-                "line_threshold": ("FLOAT", {
-                    "default": 0.1,
-                    "min": 0.01,
-                    "max": 1.0,
-                    "step": 0.01,
                     "display": "number"
                 }),
                 "blur_radius": ("FLOAT", {
@@ -68,7 +60,7 @@ class EnhancedPaintByNumbersNode:
         }
 
     RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("paint_by_numbers",)
+    RETURN_NAMES = ("color_quantized",)
     FUNCTION = "process"
     CATEGORY = "image/artistic"
 
@@ -109,17 +101,6 @@ class EnhancedPaintByNumbersNode:
 
         img_rgb = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
         return Image.fromarray(img_rgb)
-
-    def extract_line_mask(self, lineart_pil, threshold):
-        """Extract line mask from lineart"""
-        if lineart_pil.mode != 'L':
-            lineart_gray = lineart_pil.convert('L')
-        else:
-            lineart_gray = lineart_pil
-
-        lineart_np = np.array(lineart_gray).astype(np.float32) / 255.0
-        line_mask = (lineart_np < threshold).astype(np.float32)
-        return line_mask
 
     def quantize_colors_improved(self, image_pil, num_colors, intensity=1.0):
         """Improved color quantization with better sampling"""
@@ -212,15 +193,10 @@ class EnhancedPaintByNumbersNode:
 
         return image_np.astype(np.uint8)
 
-    def create_paint_by_numbers(self, original_pil, lineart_pil, num_colors,
-                                line_threshold, blur_radius, color_intensity,
-                                noise_reduction_strength, use_bilateral,
-                                use_morphological, min_region_size):
-        """Enhanced paint-by-numbers creation with noise reduction"""
-
-        # Resize lineart to match original if needed
-        if original_pil.size != lineart_pil.size:
-            lineart_pil = lineart_pil.resize(original_pil.size, Image.Resampling.LANCZOS)
+    def create_color_quantized_image(self, original_pil, num_colors, blur_radius,
+                                     color_intensity, noise_reduction_strength,
+                                     use_bilateral, use_morphological, min_region_size):
+        """Create clean color quantized image without lineart"""
 
         # Step 1: Denoise the original image
         denoised = self.denoise_image(original_pil, noise_reduction_strength, use_bilateral)
@@ -243,40 +219,25 @@ class EnhancedPaintByNumbersNode:
         if use_morphological:
             quantized_np = self.apply_morphological_cleanup(quantized_np)
 
-        # Step 6: Extract line mask and apply
-        line_mask = self.extract_line_mask(lineart_pil, line_threshold)
-        line_mask_3d = np.stack([line_mask] * 3, axis=2)
-
-        # Create final image with lines
-        quantized_np = quantized_np.astype(np.float32)
-        line_color = np.array([20, 20, 20])  # Dark gray for lines
-        final_image = quantized_np * (1 - line_mask_3d) + line_color * line_mask_3d
-
         # Convert back to PIL
-        final_image = np.clip(final_image, 0, 255).astype(np.uint8)
-        result = Image.fromarray(final_image)
-
+        result = Image.fromarray(quantized_np.astype(np.uint8))
         return result
 
-    def process(self, original_image, lineart_image, num_colors, line_threshold,
-                blur_radius, color_intensity, noise_reduction_strength,
-                bilateral_filter, morphological_cleanup, min_region_size):
-        """Process the images and return enhanced paint-by-numbers result"""
+    def process(self, original_image, num_colors, blur_radius, color_intensity,
+                noise_reduction_strength, bilateral_filter, morphological_cleanup,
+                min_region_size):
+        """Process the image and return color quantized result"""
 
-        # Convert tensors to PIL Images
+        # Convert tensor to PIL Image
         original_pil = self.tensor_to_pil(original_image)
-        lineart_pil = self.tensor_to_pil(lineart_image)
 
         # Ensure RGB mode
         if original_pil.mode != 'RGB':
             original_pil = original_pil.convert('RGB')
-        if lineart_pil.mode not in ['RGB', 'L']:
-            lineart_pil = lineart_pil.convert('RGB')
 
-        # Create enhanced paint-by-numbers effect
-        result_pil = self.create_paint_by_numbers(
-            original_pil, lineart_pil, num_colors,
-            line_threshold, blur_radius, color_intensity,
+        # Create color quantized effect
+        result_pil = self.create_color_quantized_image(
+            original_pil, num_colors, blur_radius, color_intensity,
             noise_reduction_strength, bilateral_filter,
             morphological_cleanup, min_region_size
         )
@@ -293,7 +254,7 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "EnhancedPaintByNumbersNode": "Enhanced Paint by Numbers Converter"
+    "EnhancedPaintByNumbersNode": "Enhanced Color Quantizer"
 }
 
 
