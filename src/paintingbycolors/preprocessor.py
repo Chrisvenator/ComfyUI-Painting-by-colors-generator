@@ -143,7 +143,7 @@ class EnhancedPaintByNumbersNode:
         return Image.fromarray(quantized_image)
 
     def quantize_to_hex_palette(self, image_pil, hex_colors, rgb_colors, intensity=1.0):
-        """Quantize image colors to match the provided hex palette"""
+        """Quantize image colors to match the provided hex palette using optimized approach"""
         img_array = np.array(image_pil)
         original_shape = img_array.shape
 
@@ -153,14 +153,19 @@ class EnhancedPaintByNumbersNode:
         # Apply color intensity
         pixels = np.clip(pixels * intensity, 0, 255)
 
-        # Find the closest color in the palette for each pixel
-        quantized_pixels = np.zeros_like(pixels)
+        # Vectorized distance calculation for better performance
+        # Expand dimensions for broadcasting: pixels -> (N, 1, 3), palette -> (1, K, 3)
+        pixels_expanded = pixels[:, np.newaxis, :]  # Shape: (N, 1, 3)
+        palette_expanded = rgb_colors[np.newaxis, :, :]  # Shape: (1, K, 3)
 
-        for i, pixel in enumerate(pixels):
-            # Calculate distance to all palette colors
-            distances = np.sum((rgb_colors - pixel) ** 2, axis=1)
-            closest_color_idx = np.argmin(distances)
-            quantized_pixels[i] = rgb_colors[closest_color_idx]
+        # Calculate squared Euclidean distances
+        distances = np.sum((pixels_expanded - palette_expanded) ** 2, axis=2)  # Shape: (N, K)
+
+        # Find closest color indices
+        closest_indices = np.argmin(distances, axis=1)
+
+        # Map pixels to closest palette colors
+        quantized_pixels = rgb_colors[closest_indices]
 
         quantized_image = quantized_pixels.reshape(original_shape).astype(np.uint8)
         return Image.fromarray(quantized_image)
@@ -170,29 +175,46 @@ class EnhancedPaintByNumbersNode:
         img_array = np.array(image_pil)
         pixels = img_array.reshape(-1, 3).astype(np.float32)
 
-        # Sample pixels for performance
-        n_samples = min(10000, len(pixels))
+        # Sample pixels for performance but keep it representative
+        n_samples = min(20000, len(pixels))
         if len(pixels) > n_samples:
-            step = len(pixels) // n_samples
-            sampled_pixels = pixels[::step]
+            # Use random sampling instead of step sampling for better representation
+            indices = np.random.choice(len(pixels), n_samples, replace=False)
+            sampled_pixels = pixels[indices]
         else:
             sampled_pixels = pixels
 
-        # Calculate how well each palette color represents the image
+        # Calculate color usage scores more accurately
         color_scores = []
+
         for i, palette_color in enumerate(rgb_colors):
-            # Find distance from each sampled pixel to this palette color
+            # Calculate distances from sampled pixels to this palette color
             distances = np.sum((sampled_pixels - palette_color) ** 2, axis=1)
-            # Score based on how many pixels this color can represent well
-            close_pixels = np.sum(distances < 2000)  # Threshold for "close enough"
+
+            # Multiple scoring criteria
+            min_distance = np.min(distances)
             avg_distance = np.mean(distances)
-            # Combine metrics: more close pixels is good, lower average distance is good
-            score = close_pixels / (1 + avg_distance / 1000)
+            median_distance = np.median(distances)
+
+            # Count pixels that would use this color (closest match)
+            all_distances = np.sum((sampled_pixels[:, np.newaxis, :] - rgb_colors[np.newaxis, :, :]) ** 2, axis=2)
+            closest_colors = np.argmin(all_distances, axis=1)
+            usage_count = np.sum(closest_colors == i)
+
+            # Combined score: higher usage and lower distances are better
+            if usage_count > 0:
+                score = usage_count / (1 + avg_distance / 100)
+            else:
+                score = 0
+
             color_scores.append((score, i))
 
         # Sort by score and select top colors
-        color_scores.sort(reverse=True)
-        selected_indices = [idx for _, idx in color_scores[:max_colors]]
+        color_scores.sort(reverse=True, key=lambda x: x[0])
+
+        # Ensure we get at least some colors even if scores are low
+        num_to_select = min(max_colors, len(rgb_colors))
+        selected_indices = [idx for _, idx in color_scores[:num_to_select]]
 
         return rgb_colors[selected_indices]
 
@@ -227,40 +249,47 @@ class EnhancedPaintByNumbersNode:
 
         return image_np
 
-    def apply_morphological_cleanup(self, image_np):
-        """Apply morphological operations to clean up the image"""
+    def apply_gentle_cleanup(self, image_np):
+        """Apply gentler morphological operations to clean up the image"""
         # Convert to single channel for morphological operations
         gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
 
-        # Apply closing to fill small gaps
-        kernel = np.ones((3, 3), np.uint8)
-        closed = cv2.morphologyEx(gray, cv2.MORPH_CLOSE, kernel)
+        # Use smaller kernel for gentler operations
+        kernel = np.ones((2, 2), np.uint8)
 
-        # Apply opening to remove small noise
-        opened = cv2.morphologyEx(closed, cv2.MORPH_OPEN, kernel)
+        # Very light closing to fill tiny gaps
+        closed = cv2.morphologyEx(gray, cv2.MORPH_CLOSE, kernel, iterations=1)
 
-        # Use the cleaned mask to guide color correction
-        mask_diff = (opened != gray).astype(np.float32)
+        # Light opening to remove small noise
+        opened = cv2.morphologyEx(closed, cv2.MORPH_OPEN, kernel, iterations=1)
+
+        # Only fix significant differences
+        mask_diff = np.abs(opened.astype(np.float32) - gray.astype(np.float32)) > 10
+        mask_diff = mask_diff.astype(np.float32)
 
         if np.sum(mask_diff) > 0:
-            # Smooth the problematic areas
-            blurred = cv2.GaussianBlur(image_np, (5, 5), 0)
+            # Very light smoothing only where needed
+            blurred = cv2.GaussianBlur(image_np, (3, 3), 0)
             mask_3d = np.stack([mask_diff] * 3, axis=2)
-            image_np = image_np * (1 - mask_3d) + blurred * mask_3d
+            image_np = image_np * (1 - mask_3d * 0.3) + blurred * (mask_3d * 0.3)
 
         return image_np.astype(np.uint8)
 
     def create_color_quantized_image(self, original_pil, hex_stack, num_colors, blur_radius,
                                      color_intensity, noise_reduction_strength,
                                      use_bilateral, use_morphological, min_region_size):
-        """Create clean color quantized image without lineart"""
+        """Create clean color quantized image optimized for paint-by-numbers"""
 
-        # Step 1: Denoise the original image
-        denoised = self.denoise_image(original_pil, noise_reduction_strength, use_bilateral)
+        # Step 1: More gentle denoising to preserve details
+        if noise_reduction_strength > 0:
+            denoised = self.denoise_image(original_pil, noise_reduction_strength * 0.7, use_bilateral)
+        else:
+            denoised = original_pil
 
-        # Step 2: Apply blur for smoother color regions
+        # Step 2: Apply blur for smoother color regions (reduce intensity)
         if blur_radius > 0:
-            blurred_original = denoised.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+            # Use a gentler blur
+            blurred_original = denoised.filter(ImageFilter.GaussianBlur(radius=blur_radius * 0.8))
         else:
             blurred_original = denoised
 
@@ -283,14 +312,17 @@ class EnhancedPaintByNumbersNode:
             # Use automatic color quantization
             quantized = self.quantize_colors_improved(blurred_original, num_colors, color_intensity)
 
-        # Step 4: Clean up small regions
+        # Step 4: More conservative region cleanup
         quantized_np = np.array(quantized)
         if min_region_size > 0:
-            quantized_np = self.clean_small_regions(quantized_np, min_region_size)
+            # Reduce the min region size to be less aggressive
+            adjusted_min_size = max(min_region_size // 2, 10)
+            quantized_np = self.clean_small_regions(quantized_np, adjusted_min_size)
 
-        # Step 5: Apply morphological cleanup
+        # Step 5: Gentler morphological cleanup
         if use_morphological:
-            quantized_np = self.apply_morphological_cleanup(quantized_np)
+            # Apply lighter morphological operations
+            quantized_np = self.apply_gentle_cleanup(quantized_np)
 
         # Convert back to PIL
         result = Image.fromarray(quantized_np.astype(np.uint8))
