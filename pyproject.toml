@@ -28,13 +28,13 @@ dev = [
 ]
 
 [project.urls]
-bugs = "https://github.com/Chrisvenator/paintingbycolors/issues"
-homepage = "https://github.com/Chrisvenator/paintingbycolors"
+bugs = "https://github.com/Chrisvenator/ComfyUI-Painting-by-colors-generator/issues"
+homepage = "https://github.com/Chrisvenator/ComfyUI-Painting-by-colors-generator"
 
 
 [tool.comfy]
 PublisherId = "chrisvenator"
-DisplayName = "Chrisvenator
+DisplayName = "ComfyUI-Painting-by-colors-generator"
 Icon = ""
 
 [tool.setuptools.package-data]
