@@ -13,13 +13,6 @@ class EnhancedPaintByNumbersNode:
         return {
             "required": {
                 "original_image": ("IMAGE",),
-                "num_colors": ("INT", {
-                    "default": 12,
-                    "min": 4,
-                    "max": 50,
-                    "step": 1,
-                    "display": "number"
-                }),
                 "blur_radius": ("FLOAT", {
                     "default": 2.0,
                     "min": 0.0,
@@ -54,6 +47,16 @@ class EnhancedPaintByNumbersNode:
                     "min": 10,
                     "max": 1000,
                     "step": 10,
+                    "display": "number"
+                }),
+            },
+            "optional": {
+                "hex_stack": ("HEX_STACK",),
+                "num_colors": ("INT", {
+                    "default": 12,
+                    "min": 4,
+                    "max": 50,
+                    "step": 1,
                     "display": "number"
                 }),
             }
@@ -139,6 +142,60 @@ class EnhancedPaintByNumbersNode:
 
         return Image.fromarray(quantized_image)
 
+    def quantize_to_hex_palette(self, image_pil, hex_colors, rgb_colors, intensity=1.0):
+        """Quantize image colors to match the provided hex palette"""
+        img_array = np.array(image_pil)
+        original_shape = img_array.shape
+
+        # Reshape to 2D array
+        pixels = img_array.reshape(-1, 3).astype(np.float32)
+
+        # Apply color intensity
+        pixels = np.clip(pixels * intensity, 0, 255)
+
+        # Find the closest color in the palette for each pixel
+        quantized_pixels = np.zeros_like(pixels)
+
+        for i, pixel in enumerate(pixels):
+            # Calculate distance to all palette colors
+            distances = np.sum((rgb_colors - pixel) ** 2, axis=1)
+            closest_color_idx = np.argmin(distances)
+            quantized_pixels[i] = rgb_colors[closest_color_idx]
+
+        quantized_image = quantized_pixels.reshape(original_shape).astype(np.uint8)
+        return Image.fromarray(quantized_image)
+
+    def select_optimal_colors_from_palette(self, image_pil, rgb_colors, max_colors):
+        """Select the most representative colors from the hex palette for the given image"""
+        img_array = np.array(image_pil)
+        pixels = img_array.reshape(-1, 3).astype(np.float32)
+
+        # Sample pixels for performance
+        n_samples = min(10000, len(pixels))
+        if len(pixels) > n_samples:
+            step = len(pixels) // n_samples
+            sampled_pixels = pixels[::step]
+        else:
+            sampled_pixels = pixels
+
+        # Calculate how well each palette color represents the image
+        color_scores = []
+        for i, palette_color in enumerate(rgb_colors):
+            # Find distance from each sampled pixel to this palette color
+            distances = np.sum((sampled_pixels - palette_color) ** 2, axis=1)
+            # Score based on how many pixels this color can represent well
+            close_pixels = np.sum(distances < 2000)  # Threshold for "close enough"
+            avg_distance = np.mean(distances)
+            # Combine metrics: more close pixels is good, lower average distance is good
+            score = close_pixels / (1 + avg_distance / 1000)
+            color_scores.append((score, i))
+
+        # Sort by score and select top colors
+        color_scores.sort(reverse=True)
+        selected_indices = [idx for _, idx in color_scores[:max_colors]]
+
+        return rgb_colors[selected_indices]
+
     def clean_small_regions(self, image_np, min_size):
         """Remove small isolated regions that are likely noise"""
         if min_size <= 0:
@@ -193,7 +250,7 @@ class EnhancedPaintByNumbersNode:
 
         return image_np.astype(np.uint8)
 
-    def create_color_quantized_image(self, original_pil, num_colors, blur_radius,
+    def create_color_quantized_image(self, original_pil, hex_stack, num_colors, blur_radius,
                                      color_intensity, noise_reduction_strength,
                                      use_bilateral, use_morphological, min_region_size):
         """Create clean color quantized image without lineart"""
@@ -207,8 +264,24 @@ class EnhancedPaintByNumbersNode:
         else:
             blurred_original = denoised
 
-        # Step 3: Improved color quantization
-        quantized = self.quantize_colors_improved(blurred_original, num_colors, color_intensity)
+        # Step 3: Color quantization (with or without hex stack)
+        if hex_stack is not None and hex_stack['count'] > 0:
+            # Use provided hex palette
+            rgb_colors = hex_stack['rgb_colors']
+
+            # If we have more colors than needed, select the most relevant ones
+            if len(rgb_colors) > num_colors:
+                rgb_colors = self.select_optimal_colors_from_palette(
+                    blurred_original, rgb_colors, num_colors
+                )
+
+            # Quantize to the hex palette
+            quantized = self.quantize_to_hex_palette(
+                blurred_original, hex_stack['hex_colors'], rgb_colors, color_intensity
+            )
+        else:
+            # Use automatic color quantization
+            quantized = self.quantize_colors_improved(blurred_original, num_colors, color_intensity)
 
         # Step 4: Clean up small regions
         quantized_np = np.array(quantized)
@@ -223,9 +296,9 @@ class EnhancedPaintByNumbersNode:
         result = Image.fromarray(quantized_np.astype(np.uint8))
         return result
 
-    def process(self, original_image, num_colors, blur_radius, color_intensity,
+    def process(self, original_image, blur_radius, color_intensity,
                 noise_reduction_strength, bilateral_filter, morphological_cleanup,
-                min_region_size):
+                min_region_size, hex_stack=None, num_colors=12):
         """Process the image and return color quantized result"""
 
         # Convert tensor to PIL Image
@@ -237,7 +310,7 @@ class EnhancedPaintByNumbersNode:
 
         # Create color quantized effect
         result_pil = self.create_color_quantized_image(
-            original_pil, num_colors, blur_radius, color_intensity,
+            original_pil, hex_stack, num_colors, blur_radius, color_intensity,
             noise_reduction_strength, bilateral_filter,
             morphological_cleanup, min_region_size
         )
