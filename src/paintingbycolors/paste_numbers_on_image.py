@@ -73,8 +73,25 @@ class NumbersOverlayNode:
         """Create a mask for non-white pixels in the numbers image"""
         numbers_array = np.array(numbers_img)
 
-        # Create mask for non-white pixels
-        non_white_mask = np.any(numbers_array < white_threshold, axis=2)
+        # Debug: Print shape and sample values
+        print(f"Numbers array shape: {numbers_array.shape}")
+        print(f"Numbers array dtype: {numbers_array.dtype}")
+        print(f"Numbers array min/max: {numbers_array.min()}/{numbers_array.max()}")
+        print(f"White threshold: {white_threshold}")
+
+        # Create mask for non-white pixels - check all channels
+        if len(numbers_array.shape) == 3 and numbers_array.shape[2] == 3:
+            # For RGB images, pixel is considered non-white if ANY channel is below threshold
+            non_white_mask = np.any(numbers_array < white_threshold, axis=2)
+        elif len(numbers_array.shape) == 2:
+            # For grayscale images
+            non_white_mask = numbers_array < white_threshold
+        else:
+            # Fallback
+            non_white_mask = np.any(numbers_array < white_threshold, axis=-1)
+
+        print(f"Non-white mask shape: {non_white_mask.shape}")
+        print(f"Non-white pixels found: {np.sum(non_white_mask)}")
 
         return non_white_mask
 
@@ -96,7 +113,7 @@ class NumbersOverlayNode:
             mask = overlay < 0.5
             result = np.where(mask,
                               base - (1 - 2 * overlay) * base * (1 - base),
-                              base + (2 * overlay - 1) * (np.sqrt(base) - base))
+                              base + (2 * overlay - 1) * (np.sqrt(np.maximum(base, 1e-10)) - base))
         else:
             result = overlay
 
@@ -121,6 +138,8 @@ class NumbersOverlayNode:
 
         print(f"Input image size: {input_pil.size}")
         print(f"Numbers image size: {numbers_pil.size}")
+        print(f"Input image mode: {input_pil.mode}")
+        print(f"Numbers image mode: {numbers_pil.mode}")
 
         # Scale numbers image to match input image size if needed
         if auto_scale and numbers_pil.size != input_pil.size:
@@ -132,6 +151,9 @@ class NumbersOverlayNode:
         input_array = np.array(input_pil)
         numbers_array = np.array(numbers_pil)
 
+        print(f"Input array shape: {input_array.shape}, dtype: {input_array.dtype}")
+        print(f"Numbers array shape: {numbers_array.shape}, dtype: {numbers_array.dtype}")
+
         # Handle size mismatch if auto_scale is disabled
         if not auto_scale and numbers_pil.size != input_pil.size:
             # Crop or pad to match sizes
@@ -141,11 +163,13 @@ class NumbersOverlayNode:
             if numbers_h > input_h or numbers_w > input_w:
                 # Crop numbers image
                 numbers_array = numbers_array[:input_h, :input_w]
+                print(f"Cropped numbers array to: {numbers_array.shape}")
             elif numbers_h < input_h or numbers_w < input_w:
                 # Pad numbers image with white
                 padded = np.full((input_h, input_w, 3), 255, dtype=np.uint8)
                 padded[:numbers_h, :numbers_w] = numbers_array
                 numbers_array = padded
+                print(f"Padded numbers array to: {numbers_array.shape}")
 
         # Create mask for non-white pixels in numbers image
         non_white_mask = self.create_mask_from_image(Image.fromarray(numbers_array), white_threshold)
@@ -155,6 +179,8 @@ class NumbersOverlayNode:
 
         # Apply overlay only where there are non-white pixels in the numbers image
         if np.any(non_white_mask):
+            print(f"Applying overlay to {np.sum(non_white_mask)} pixels")
+
             if blend_mode == "replace" and transparency == 1.0:
                 # Simple replacement for better performance
                 result_array[non_white_mask] = numbers_array[non_white_mask]
@@ -167,6 +193,9 @@ class NumbersOverlayNode:
                     transparency
                 )
                 result_array[non_white_mask] = blended_pixels
+        else:
+            print("WARNING: No non-white pixels found in numbers image!")
+            print(f"Numbers array sample values: {numbers_array[:5, :5, 0] if numbers_array.size > 0 else 'empty'}")
 
         # Convert back to PIL Image and then to tensor
         result_pil = Image.fromarray(result_array)
@@ -196,7 +225,7 @@ class NumbersOverlayAdvancedNode:
                 "mask_image": ("MASK",),
                 "white_threshold": ("INT", {
                     "default": 240,
-                    "min": 200,
+                    "min": 0,  # Changed from 200 to 0 for more flexibility
                     "max": 255,
                     "step": 5,
                     "display": "number"
@@ -260,7 +289,11 @@ class NumbersOverlayAdvancedNode:
     def hex_to_rgb(self, hex_color):
         """Convert hex color to RGB tuple"""
         hex_color = hex_color.lstrip('#')
-        return tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
+        try:
+            return tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
+        except (ValueError, IndexError):
+            print(f"Invalid hex color: {hex_color}, using white instead")
+            return (255, 255, 255)
 
     def apply_outline(self, mask, outline_width):
         """Apply outline/border to mask"""
@@ -270,6 +303,24 @@ class NumbersOverlayAdvancedNode:
         kernel = np.ones((outline_width * 2 + 1, outline_width * 2 + 1), np.uint8)
         dilated = cv2.dilate(mask.astype(np.uint8), kernel, iterations=1)
         return dilated.astype(bool)
+
+    def create_numbers_mask(self, numbers_array, white_threshold):
+        """Create mask for non-white pixels with better debugging"""
+        print(f"Creating mask - Array shape: {numbers_array.shape}, dtype: {numbers_array.dtype}")
+        print(f"Array min/max: {numbers_array.min()}/{numbers_array.max()}")
+        print(f"White threshold: {white_threshold}")
+
+        # Create mask for non-white pixels
+        if len(numbers_array.shape) == 3 and numbers_array.shape[2] == 3:
+            non_white_mask = np.any(numbers_array < white_threshold, axis=2)
+        elif len(numbers_array.shape) == 2:
+            non_white_mask = numbers_array < white_threshold
+        else:
+            non_white_mask = np.any(numbers_array < white_threshold, axis=-1)
+
+        print(f"Mask created - Non-white pixels: {np.sum(non_white_mask)} out of {non_white_mask.size}")
+
+        return non_white_mask
 
     def overlay_numbers_advanced(self, input_image, numbers_image, transparency,
                                  mask_image=None, white_threshold=240, blend_mode="replace",
@@ -287,6 +338,8 @@ class NumbersOverlayAdvancedNode:
         if numbers_pil.mode != 'RGB':
             numbers_pil = numbers_pil.convert('RGB')
 
+        print(f"Advanced overlay - Input: {input_pil.size}, Numbers: {numbers_pil.size}")
+
         # Scale numbers image if needed
         if auto_scale and numbers_pil.size != input_pil.size:
             scaling_methods = {
@@ -297,15 +350,27 @@ class NumbersOverlayAdvancedNode:
             }
             scaling_filter = scaling_methods.get(scaling_method, Image.Resampling.LANCZOS)
             numbers_pil = numbers_pil.resize(input_pil.size, scaling_filter)
+            print(f"Scaled numbers image to: {numbers_pil.size}")
 
         # Convert to numpy arrays
         input_array = np.array(input_pil)
         numbers_array = np.array(numbers_pil)
 
+        # Ensure arrays match in size
+        if numbers_array.shape[:2] != input_array.shape[:2]:
+            print(f"Size mismatch - Input: {input_array.shape}, Numbers: {numbers_array.shape}")
+            # Resize numbers array to match input
+            from PIL import Image as PILImage
+            numbers_pil_temp = PILImage.fromarray(numbers_array)
+            numbers_pil_temp = numbers_pil_temp.resize((input_array.shape[1], input_array.shape[0]), PILImage.Resampling.LANCZOS)
+            numbers_array = np.array(numbers_pil_temp)
+            print(f"Resized numbers array to: {numbers_array.shape}")
+
         # Create mask for non-white pixels
-        non_white_mask = np.any(numbers_array < white_threshold, axis=2)
+        non_white_mask = self.create_numbers_mask(numbers_array, white_threshold)
 
         # Apply outline if specified
+        outline_only_mask = None
         if outline_width > 0:
             outlined_mask = self.apply_outline(non_white_mask, outline_width)
             outline_only_mask = outlined_mask & ~non_white_mask
@@ -317,22 +382,27 @@ class NumbersOverlayAdvancedNode:
                 external_mask = cv2.resize(external_mask.astype(np.uint8),
                                            (non_white_mask.shape[1], non_white_mask.shape[0])) > 0.5
             non_white_mask = non_white_mask & external_mask
+            print(f"Applied external mask, remaining pixels: {np.sum(non_white_mask)}")
 
         # Create result image
         result_array = input_array.copy()
 
         # Apply outline first if specified
-        if outline_width > 0:
+        if outline_width > 0 and outline_only_mask is not None:
             outline_rgb = self.hex_to_rgb(outline_color)
             result_array[outline_only_mask] = outline_rgb
+            print(f"Applied outline to {np.sum(outline_only_mask)} pixels")
 
         # Color replacement if specified
         if numbers_color != "auto" and numbers_color.startswith('#'):
             new_color = self.hex_to_rgb(numbers_color)
             numbers_array[non_white_mask] = new_color
+            print(f"Applied color replacement: {new_color}")
 
         # Apply overlay
         if np.any(non_white_mask):
+            print(f"Applying overlay to {np.sum(non_white_mask)} pixels with transparency {transparency}")
+
             if blend_mode == "replace" and transparency == 1.0:
                 result_array[non_white_mask] = numbers_array[non_white_mask]
             else:
@@ -342,6 +412,8 @@ class NumbersOverlayAdvancedNode:
                         input_array[non_white_mask, i] * (1 - transparency) +
                         numbers_array[non_white_mask, i] * transparency
                     ).astype(np.uint8)
+        else:
+            print("WARNING: No pixels to overlay after all masking operations!")
 
         # Convert results back to tensors
         result_pil = Image.fromarray(result_array)
@@ -349,7 +421,7 @@ class NumbersOverlayAdvancedNode:
 
         # Create mask tensor for output
         final_mask = non_white_mask.astype(np.float32)
-        if outline_width > 0:
+        if outline_width > 0 and outline_only_mask is not None:
             final_mask = final_mask | outline_only_mask.astype(np.float32)
         mask_tensor = self.mask_to_tensor(final_mask)
 
