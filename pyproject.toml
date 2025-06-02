@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ComfyUI-Painting-by-colors-generator"
-version = "1.0.0"
+version = "1.0.1"
 description = "Create a painting by colors image from an image"
 authors = [
   {name = "chrisvenator", email = "55980003+Chrisvenator@users.noreply.github.com"}
