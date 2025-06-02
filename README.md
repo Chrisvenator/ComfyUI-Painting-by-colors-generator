@@ -1,7 +1,7 @@
 # ComfyUI-PaintingByColors
 
 Create a painting-by-colors image from an image
-
+![Overview.png](assets/Overview.png)
 > [!NOTE]
 > This projected was created with a [cookiecutter](https://github.com/Comfy-Org/cookiecutter-comfy-extension) template.
 > It helps you start writing custom nodes without worrying about the Python setup.
