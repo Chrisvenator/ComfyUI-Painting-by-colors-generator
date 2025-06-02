@@ -3,7 +3,7 @@ requires = ["setuptools>=70.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ComfyUI-Painting-by-color-generator"
+name = "ComfyUI-Painting-by-colors-generator"
 version = "1.0.1"
 description = "Create a painting by colors image from an image"
 authors = [
@@ -34,7 +34,7 @@ homepage = "https://github.com/Chrisvenator/ComfyUI-Painting-by-colors-generator
 
 [tool.comfy]
 PublisherId = "chrisvenator"
-DisplayName = "ComfyUI-Painting-by-color-generator"
+DisplayName = "ComfyUI-Painting-by-colors-generator"
 Icon = ""
 
 [tool.setuptools.package-data]
