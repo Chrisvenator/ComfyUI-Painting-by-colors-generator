@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "painting-by-colors-generator"
-version = "1.0.2"
+version = "1.0.4"
 description = "Create a painting by colors image from an image"
 authors = [
   {name = "chrisvenator", email = "55980003+Chrisvenator@users.noreply.github.com"}
@@ -28,8 +28,10 @@ dev = [
 ]
 
 [project.urls]
-bugs = "https://github.com/Chrisvenator/painting-by-colors-generator/issues"
-homepage = "https://github.com/Chrisvenator/painting-by-colors-generator"
+Repository = "https://github.com/Chrisvenator/ComfyUI-Painting-by-colors-generator/"
+Homepage   = "https://github.com/Chrisvenator/ComfyUI-Painting-by-colors-generator/"
+Bugs       = "https://github.com/Chrisvenator/ComfyUI-Painting-by-colors-generator/issues"
+
 
 
 [tool.comfy]
